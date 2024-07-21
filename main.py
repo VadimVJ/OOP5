@@ -7,48 +7,56 @@ import sys
 pygame.init()
 
 # Константы
-SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 600
-SHIP_WIDTH = 100
-SHIP_HEIGHT = 50
-TORPEDO_WIDTH = 10
-TORPEDO_HEIGHT = 20
-SHIP_SPEED = 1
-TORPEDO_SPEED = 8
+WIDTH, HEIGHT = 800, 600
+FPS = 60
+SHIP_WIDTH, SHIP_HEIGHT = 100, 50  # размеры корабля
+TORPEDO_WIDTH, TORPEDO_HEIGHT = 10, 30  # размеры торпеды
+TorpedoLauncher_COLOR = (0, 0, 0)
+SHIP_COLOR = (0, 0, 0)
+TORPEDO_COLOR = (0, 0, 0)
+BACKGROUND_COLOR = (0, 139, 139)  # темно-аквамариновый
 
-# Цвета
-COLOR_AQUAMARINE = (100, 255, 255)
-COLOR_BLACK = (0, 0, 0)
+# Настройка экрана
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Торпедный аппарат")
 
-# Создание экрана
-screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption("Корабль и торпеда")
-
-# Класс для корабля
-class Ship:
+# Класс для торпедного аппарата
+class TorpedoLauncher:
     def __init__(self):
-        self.rect = pygame.Rect(0, 10, SHIP_WIDTH, SHIP_HEIGHT)
-        self.direction = 1  # 1 - вправо, -1 - влево
+        self.x = WIDTH // 2
+        self.y = HEIGHT - 50
+        self.speed = 10
 
-    def update(self):
-        self.rect.x += self.direction * SHIP_SPEED
-        if self.rect.right > SCREEN_WIDTH or self.rect.left < 0:
-            self.direction *= -1  # Изменение направления
+    def move(self, direction):
+        if direction == "left" and self.x > 0:
+            self.x -= self.speed
+        elif direction == "right" and self.x < WIDTH - 50:  # 50 - ширина аппарата
+            self.x += self.speed
+
+    def draw(self, surface):
+        pygame.draw.rect(surface, TorpedoLauncher_COLOR, (self.x, self.y, 50, 20))
 
 # Класс для торпеды
 class Torpedo:
     def __init__(self, x):
-        self.rect = pygame.Rect(x, SCREEN_HEIGHT - 30, TORPEDO_WIDTH, TORPEDO_HEIGHT)
+        self.x = x
+        self.y = HEIGHT - 50
+        self.speed = 15
 
-    def update(self):
-        self.rect.y -= TORPEDO_SPEED
+    def move(self):
+        self.y -= self.speed
 
-# Основная функция
+    def draw(self, surface):
+        pygame.draw.rect(surface, TORPEDO_COLOR, (self.x, self.y, TORPEDO_WIDTH, TORPEDO_HEIGHT))
+
+# Главная функция игры
 def main():
     clock = pygame.time.Clock()
-    ship = Ship()
+    launcher = TorpedoLauncher()
     torpedoes = []
-    game_over = False
+    ship_x = 0
+    ship_direction = 1  # 1 - вправо, -1 - влево
+    ship_hit = False
     font = pygame.font.Font(None, 74)
 
     while True:
@@ -56,41 +64,44 @@ def main():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
-
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_LEFT:
-                    if ship.rect.left > 0:
-                        ship.rect.x -= SHIP_SPEED
+                    launcher.move("left")
                 if event.key == pygame.K_RIGHT:
-                    if ship.rect.right < SCREEN_WIDTH:
-                        ship.rect.x += SHIP_SPEED
-                if event.key == pygame.K_UP and not game_over:
-                    torpedoes.append(Torpedo(ship.rect.centerx))
+                    launcher.move("right")
+                if event.key == pygame.K_UP:
+                    torpedoes.append(Torpedo(launcher.x + 20))  # стрельба из центра аппарата
 
-        if not game_over:
-            ship.update()
-            for torpedo in torpedoes[:]:
-                torpedo.update()
-                # Проверка попадания в корабль
-                if torpedo.rect.colliderect(ship.rect):
-                    game_over = True
-                if torpedo.rect.bottom < 0:
-                    torpedoes.remove(torpedo)
+        # Движение корабля
+        if not ship_hit:
+            ship_x += ship_direction * 5
+            if ship_x > WIDTH - SHIP_WIDTH or ship_x < 0:
+                ship_direction *= -1
 
-        # Отрисовка
-        screen.fill(COLOR_AQUAMARINE)
-        pygame.draw.rect(screen, COLOR_BLACK, ship.rect)
+        # Обновление и движение торпед
+        for torpedo in torpedoes[:]:
+            torpedo.move()
+            if torpedo.y < 0:  # Удаление торпед, вышедших за экран
+                torpedoes.remove(torpedo)
+
+            # Проверка на попадание в корабль
+            if not ship_hit and (ship_x < torpedo.x < ship_x + SHIP_WIDTH) and (0 < torpedo.y < SHIP_HEIGHT):
+                ship_hit = True
+
+        # Рендеринг
+        screen.fill(BACKGROUND_COLOR)
+        launcher.draw(screen)
+        pygame.draw.rect(screen, SHIP_COLOR, (ship_x, 0, SHIP_WIDTH, SHIP_HEIGHT))
 
         for torpedo in torpedoes:
-            pygame.draw.rect(screen, COLOR_BLACK, torpedo.rect)
+            torpedo.draw(screen)
 
-        if game_over:
-            text = font.render("КОРАБЛЬ ТОРПЕДИРОВАН", True, COLOR_BLACK)
-            text_rect = text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
-            screen.blit(text, text_rect)
+        if ship_hit:
+            text = font.render("КОРАБЛЬ ТОРПЕДИРОВАН", True, (255, 0, 0))
+            screen.blit(text, (WIDTH // 2 - text.get_width() // 2, HEIGHT // 2 - text.get_height() // 2))
 
         pygame.display.flip()
-        clock.tick(60)
+        clock.tick(FPS)
 
 if __name__ == "__main__":
     main()
